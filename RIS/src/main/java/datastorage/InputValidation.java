@@ -16,15 +16,15 @@ import javafx.scene.control.Alert;
 public class InputValidation {
 
     public static boolean validateName(String name) {
-        if (name == null || name.isBlank() || !name.matches("^[a-zA-Z]+ [a-zA-Z]+$")) {
-            Alert a = new Alert(Alert.AlertType.INFORMATION);
-            a.setTitle("Error");
-            a.setHeaderText("Try Again");
-            a.setContentText("Please enter a valid full name. \n");
-            a.show();
-            return false;
+        if (name.matches("^[a-zA-Z\\-]+ [a-zA-Z\\-]+(?: [a-zA-Z\\.]+)?$")) {
+            return true;
         }
-        return true;
+        Alert a = new Alert(Alert.AlertType.INFORMATION); 
+        a.setTitle("Error");
+        a.setHeaderText("Try Again");
+        a.setContentText("Please enter a valid full name. \n");
+        a.show();
+        return false;
     }
 
     public static boolean validateUsername(String name) {
@@ -52,7 +52,7 @@ public class InputValidation {
     }
 
     public static boolean validateEmail(String email) {
-        if (email == null || email.isBlank() || !email.matches("[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")) {
+        if (email == null || email.isBlank() || !email.matches("[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\\.)+[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?")) {
             Alert a = new Alert(Alert.AlertType.INFORMATION);
             a.setTitle("Error");
             a.setHeaderText("Try Again");
