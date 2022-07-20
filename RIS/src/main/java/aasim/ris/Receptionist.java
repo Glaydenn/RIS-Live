@@ -381,7 +381,7 @@ public class Receptionist extends Stage {
                 container.getChildren().clear();
 
                 ComboBox dropdown = new ComboBox();
-                dropdown.getItems().addAll("Patient Did Not Show", "Appointment Scheduled", "Patient Checked In", "Patient received by Technician", "Patient Cancelled", "Faculty Cancelled");
+                dropdown.getItems().addAll("Patient Did Not Show", "Appointment Scheduled", "Patient Checked In", "Patient Cancelled", "Faculty Cancelled");
 
                 dropdown.setValue(appt.getStatus());
                 Button submit = new Button("Submit");

@@ -184,8 +184,8 @@ public class Technician extends Stage {
                 list.add(appt);
             }
             for (Appointment z : list) {
-                if (z.getStatus().contains("recieved") || z.getStatus().contains("received")) {
-                    z.placeholder.setText("Check In");
+                if (z.getStatus().contains("Checked in") || z.getStatus().contains("Checked In")) {
+                    z.placeholder.setText("Receive patient");
                     z.placeholder.setOnAction(new EventHandler<ActionEvent>() {
                         @Override
                         public void handle(ActionEvent e) {
@@ -193,7 +193,7 @@ public class Technician extends Stage {
                         }
                     });
                 } else {
-                    z.placeholder.setText("Patient not Received yet");
+                    z.placeholder.setText("Patient Not Checked In");
                     z.placeholder.setId("cancel");
                 }
             }
