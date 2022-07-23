@@ -61,8 +61,6 @@ public class Billing extends Stage {
     TableView table = new TableView();
     Label billing = new Label("Billing");
     Label metrics = new Label("Metrics");
-    VBox billingContainer = new VBox();
-    VBox metricsContainer = new VBox();
 
     //Search Bar
     FilteredList<Appointment> flAppointment;
@@ -72,9 +70,10 @@ public class Billing extends Stage {
     //Buttons
     Button refreshTable = new Button("Refresh Appointments");
     //Containers
-    HBox searchContainer = new HBox(choiceBox, search);
-    HBox buttonContainer = new HBox(refreshTable, searchContainer);
-    VBox tableContainer = new VBox(table, buttonContainer);
+    HBox searchContainer = new HBox(choiceBox, search); // For billing view.
+    HBox buttonContainer = new HBox(refreshTable, searchContainer); // For billing view.
+    VBox billingContainer = new VBox(table, buttonContainer);
+    VBox metricsContainer = new VBox();
 
 //</editor-fold>
     ArrayList<Order> varName = new ArrayList<>();
@@ -100,116 +99,17 @@ public class Billing extends Stage {
         metrics.setId("navbar");
         //End navbar
 
-        //Putting center code here as to not clutter stuff
-        loadCenter();
-        varName = populateOrders();
-        //Buttons
-        logOut.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent e) {
-                logOut();
-            }
-        });
-//        addAppointment.setOnAction(new EventHandler<ActionEvent>() {
-//            @Override
-//            public void handle(ActionEvent e) {
-//                addAppointment();
-//            }
-//        });
-
-        refreshTable.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent e) {
-                populateTable();
-            }
-        });
-//         check.setOnAction(new EventHandler<ActionEvent>() {
-//            @Override
-//            public void handle(ActionEvent e) {
-//                billWindow();
-//            }
-//        });
-
-        //Searchbar Structure
-        searchContainer.setAlignment(Pos.TOP_RIGHT);
-        HBox.setHgrow(searchContainer, Priority.ALWAYS);
-        choiceBox.setPrefHeight(40);
-        search.setPrefHeight(40);
-        choiceBox.getItems().addAll("Appointment ID", "Patient ID", "Full Name", "Date/Time", "Status");
-        choiceBox.setValue("Appointment ID");
-        search.textProperty().addListener((obs, oldValue, newValue) -> {
-            if (choiceBox.getValue().equals("Appointment ID")) {
-                flAppointment.setPredicate(p -> new String(p.getApptID() + "").contains(newValue));//filter table by Appt ID
-            }
-            if (choiceBox.getValue().equals("Patient ID")) {
-                flAppointment.setPredicate(p -> new String(p.getPatientID() + "").contains(newValue));//filter table by Patient Id
-            }
-            if (choiceBox.getValue().equals("Full Name")) {
-                flAppointment.setPredicate(p -> p.getFullName().toLowerCase().contains(newValue.toLowerCase()));//filter table by Full name
-            }
-            if (choiceBox.getValue().equals("Date/Time")) {
-                flAppointment.setPredicate(p -> p.getTime().contains(newValue));//filter table by Date/Time
-            }
-            if (choiceBox.getValue().equals("Status")) {
-                flAppointment.setPredicate(p -> p.getStatus().toLowerCase().contains(newValue.toLowerCase()));//filter table by Status
-            }
-            table.getItems().clear();
-            table.getItems().addAll(flAppointment);
-        });
-        //End Searchbar Structure
+        //Center
+        Label tutorial = new Label("Select one of the buttons above to get started!");
+        main.setCenter(tutorial);
+        billing.setOnMouseClicked(eh -> billingPageView());
+        metrics.setOnMouseClicked(eh -> metricsPageView());
+        //End Center
+        
         //Scene Structure
         scene.getStylesheets().add("file:stylesheet.css");
         this.setScene(scene);
         //End scene
-
-        //This function populates the table, making sure all NONCOMPLETED appointments are viewable
-        populateTable();
-
-    }
-
-    //Add stuff to the center, and make it look good.
-    private void loadCenter() {
-        table.getColumns().clear();
-        //Vbox to hold the table
-        tableContainer.setAlignment(Pos.TOP_CENTER);
-        tableContainer.setPadding(new Insets(20, 10, 10, 10));
-        buttonContainer.setPadding(new Insets(10));
-        buttonContainer.setSpacing(10);
-        TableColumn apptIDCol = new TableColumn("Appointment ID");
-        TableColumn patientIDCol = new TableColumn("Patient ID");
-        TableColumn firstNameCol = new TableColumn("Full Name");
-        TableColumn timeCol = new TableColumn("Time of Appt.");
-        TableColumn orderCol = new TableColumn("Orders Requested");
-        TableColumn status = new TableColumn("Status");
-        TableColumn updateAppt = new TableColumn("Update Billing");
-        TableColumn totalCost = new TableColumn("Total Cost");
-        TableColumn makePayment = new TableColumn("Make Payment");
-        TableColumn delAppt = new TableColumn("Remove Appointment");
-        //Allow Table to read Appointment class
-        apptIDCol.setCellValueFactory(new PropertyValueFactory<>("apptID"));
-        patientIDCol.setCellValueFactory(new PropertyValueFactory<>("patientID"));
-        firstNameCol.setCellValueFactory(new PropertyValueFactory<>("fullName"));
-        timeCol.setCellValueFactory(new PropertyValueFactory<>("time"));
-        orderCol.setCellValueFactory(new PropertyValueFactory<>("order"));
-        status.setCellValueFactory(new PropertyValueFactory<>("status"));
-        updateAppt.setCellValueFactory(new PropertyValueFactory<>("placeholder"));
-        totalCost.setCellValueFactory(new PropertyValueFactory<>("total"));
-        delAppt.setCellValueFactory(new PropertyValueFactory<>("placeholder1"));
-        makePayment.setCellValueFactory(new PropertyValueFactory<>("button"));
-        //Set Column Widths
-        apptIDCol.prefWidthProperty().bind(table.widthProperty().multiply(0.09));
-        patientIDCol.prefWidthProperty().bind(table.widthProperty().multiply(0.09));
-        firstNameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.1));
-        timeCol.prefWidthProperty().bind(table.widthProperty().multiply(0.06));
-        orderCol.prefWidthProperty().bind(table.widthProperty().multiply(0.2));
-        updateAppt.prefWidthProperty().bind(table.widthProperty().multiply(0.08));
-        status.prefWidthProperty().bind(table.widthProperty().multiply(0.08));
-        totalCost.prefWidthProperty().bind(table.widthProperty().multiply(0.1));
-
-        //Add columns to table
-        table.getColumns().addAll(apptIDCol, patientIDCol, firstNameCol, timeCol, orderCol, totalCost, status, updateAppt, makePayment, delAppt);
-        table.setStyle("-fx-background-color: #25A18E; -fx-text-fill: WHITE; ");
-        main.setCenter(tableContainer);
     }
 
     private void populateTable() {
@@ -631,5 +531,124 @@ public class Billing extends Stage {
         x.show();
         x.setMaximized(true);
         this.close();
+    }
+    
+    private void billingPageView()
+    {
+        // Why is this even here?
+        billingContainer.getChildren().clear();
+        billingContainer.getChildren().addAll(table, buttonContainer);
+        
+        main.setCenter(billingContainer);
+        
+        // Format page.
+        table.getColumns().clear();
+        //Vbox to hold the table
+        billingContainer.setAlignment(Pos.TOP_CENTER);
+        billingContainer.setPadding(new Insets(20, 10, 10, 10));
+        buttonContainer.setPadding(new Insets(10));
+        buttonContainer.setSpacing(10);
+        TableColumn apptIDCol = new TableColumn("Appointment ID");
+        TableColumn patientIDCol = new TableColumn("Patient ID");
+        TableColumn firstNameCol = new TableColumn("Full Name");
+        TableColumn timeCol = new TableColumn("Time of Appt.");
+        TableColumn orderCol = new TableColumn("Orders Requested");
+        TableColumn status = new TableColumn("Status");
+        TableColumn updateAppt = new TableColumn("Update Billing");
+        TableColumn totalCost = new TableColumn("Total Cost");
+        TableColumn makePayment = new TableColumn("Make Payment");
+        TableColumn delAppt = new TableColumn("Remove Appointment");
+        //Allow Table to read Appointment class
+        apptIDCol.setCellValueFactory(new PropertyValueFactory<>("apptID"));
+        patientIDCol.setCellValueFactory(new PropertyValueFactory<>("patientID"));
+        firstNameCol.setCellValueFactory(new PropertyValueFactory<>("fullName"));
+        timeCol.setCellValueFactory(new PropertyValueFactory<>("time"));
+        orderCol.setCellValueFactory(new PropertyValueFactory<>("order"));
+        status.setCellValueFactory(new PropertyValueFactory<>("status"));
+        updateAppt.setCellValueFactory(new PropertyValueFactory<>("placeholder"));
+        totalCost.setCellValueFactory(new PropertyValueFactory<>("total"));
+        delAppt.setCellValueFactory(new PropertyValueFactory<>("placeholder1"));
+        makePayment.setCellValueFactory(new PropertyValueFactory<>("button"));
+        //Set Column Widths
+        apptIDCol.prefWidthProperty().bind(table.widthProperty().multiply(0.09));
+        patientIDCol.prefWidthProperty().bind(table.widthProperty().multiply(0.09));
+        firstNameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.1));
+        timeCol.prefWidthProperty().bind(table.widthProperty().multiply(0.06));
+        orderCol.prefWidthProperty().bind(table.widthProperty().multiply(0.2));
+        updateAppt.prefWidthProperty().bind(table.widthProperty().multiply(0.08));
+        status.prefWidthProperty().bind(table.widthProperty().multiply(0.08));
+        totalCost.prefWidthProperty().bind(table.widthProperty().multiply(0.1));
+
+        //Add columns to table
+        table.getColumns().addAll(apptIDCol, patientIDCol, firstNameCol, timeCol, orderCol, totalCost, status, updateAppt, makePayment, delAppt);
+        table.setStyle("-fx-background-color: #25A18E; -fx-text-fill: WHITE; ");
+        
+        varName = populateOrders();
+        //Buttons
+        logOut.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent e) {
+                logOut();
+            }
+        });
+//        addAppointment.setOnAction(new EventHandler<ActionEvent>() {
+//            @Override
+//            public void handle(ActionEvent e) {
+//                addAppointment();
+//            }
+//        });
+
+        refreshTable.setOnAction(new EventHandler<ActionEvent>() {
+            @Override
+            public void handle(ActionEvent e) {
+                populateTable();
+            }
+        });
+//         check.setOnAction(new EventHandler<ActionEvent>() {
+//            @Override
+//            public void handle(ActionEvent e) {
+//                billWindow();
+//            }
+//        });
+
+        //Searchbar Structure
+        searchContainer.setAlignment(Pos.TOP_RIGHT);
+        HBox.setHgrow(searchContainer, Priority.ALWAYS);
+        choiceBox.setPrefHeight(40);
+        search.setPrefHeight(40);
+        choiceBox.getItems().addAll("Appointment ID", "Patient ID", "Full Name", "Date/Time", "Status");
+        choiceBox.setValue("Appointment ID");
+        search.textProperty().addListener((obs, oldValue, newValue) -> {
+            if (choiceBox.getValue().equals("Appointment ID")) {
+                flAppointment.setPredicate(p -> new String(p.getApptID() + "").contains(newValue));//filter table by Appt ID
+            }
+            if (choiceBox.getValue().equals("Patient ID")) {
+                flAppointment.setPredicate(p -> new String(p.getPatientID() + "").contains(newValue));//filter table by Patient Id
+            }
+            if (choiceBox.getValue().equals("Full Name")) {
+                flAppointment.setPredicate(p -> p.getFullName().toLowerCase().contains(newValue.toLowerCase()));//filter table by Full name
+            }
+            if (choiceBox.getValue().equals("Date/Time")) {
+                flAppointment.setPredicate(p -> p.getTime().contains(newValue));//filter table by Date/Time
+            }
+            if (choiceBox.getValue().equals("Status")) {
+                flAppointment.setPredicate(p -> p.getStatus().toLowerCase().contains(newValue.toLowerCase()));//filter table by Status
+            }
+            table.getItems().clear();
+            table.getItems().addAll(flAppointment);
+        });
+        //End Searchbar Structure
+        
+        //This function populates the table, making sure all NONCOMPLETED appointments are viewable
+        populateTable();
+    }
+    
+    private void metricsPageView()
+    {
+        metricsContainer.getChildren().clear();
+        main.setCenter(metricsContainer);
+        
+        Label helloWorld = new Label("Metrics dashboard is currently under construction.");
+        metricsContainer.getChildren().add(helloWorld);
     }
 }
