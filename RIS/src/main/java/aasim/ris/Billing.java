@@ -47,7 +47,7 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 
 public class Billing extends Stage {
-
+    
     //<editor-fold>
     //Stage Structure
     HBox navbar = new HBox();
@@ -59,6 +59,10 @@ public class Billing extends Stage {
     Scene scene = new Scene(main);
     //Table Structure
     TableView table = new TableView();
+    Label billing = new Label("Billing");
+    Label metrics = new Label("Metrics");
+    VBox billingContainer = new VBox();
+    VBox metricsContainer = new VBox();
 
     //Search Bar
     FilteredList<Appointment> flAppointment;
@@ -85,9 +89,15 @@ public class Billing extends Stage {
         logOut.setPrefHeight(30);
         username.setId("navbar");
         username.setOnMouseClicked(eh -> userInfo());
-        navbar.getChildren().addAll(username, pfp, logOut);
+        HBox navButtons = new HBox(billing, metrics);
+        navButtons.setAlignment(Pos.TOP_LEFT);
+        HBox.setHgrow(navButtons, Priority.ALWAYS);
+        navbar.getChildren().addAll(navButtons, username, pfp, logOut);
         navbar.setStyle("-fx-background-color: #2f4f4f; -fx-spacing: 15;");
         main.setTop(navbar);
+        
+        billing.setId("navbar");
+        metrics.setId("navbar");
         //End navbar
 
         //Putting center code here as to not clutter stuff
