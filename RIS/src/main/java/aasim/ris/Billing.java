@@ -75,7 +75,10 @@ public class Billing extends Stage {
     
     // Metrics date range selector.
     // TODO: Turn this into an actual date range selector.
-    Label metricsDateRange = new Label("Date range: ALL");
+    Label metricsDateBeginLabel = new Label("From:");
+    Label metricsDateEndLabel = new Label("To:");
+    DatePicker metricsDateBegin = new DatePicker();
+    DatePicker metricsDateEnd = new DatePicker();
 
     //Buttons
     Button billingRefreshTable = new Button("Refresh Appointments");
@@ -84,7 +87,10 @@ public class Billing extends Stage {
     HBox billingSearchContainer = new HBox(billingChoiceBox, search);
     HBox billingButtonContainer = new HBox(billingRefreshTable, billingSearchContainer);
     VBox billingContainer = new VBox(table, billingButtonContainer);
-    HBox metricsButtonContainer = new HBox(metricsChoiceBox, metricsDateRange);
+    HBox metricsDateBeginContainer = new HBox(metricsDateBeginLabel, metricsDateBegin);
+    HBox metricsDateEndContainer = new HBox(metricsDateEndLabel, metricsDateEnd);
+    VBox metricsDateRangeContainer = new VBox(metricsDateBeginContainer, metricsDateEndContainer);
+    HBox metricsButtonContainer = new HBox(metricsChoiceBox, metricsDateRangeContainer);
     VBox metricsContainer = new VBox(); // Contents added on the fly.
 
 //</editor-fold>
@@ -132,7 +138,7 @@ public class Billing extends Stage {
         table.getItems().clear();
         //Connect to database
 
-        String sql = "Select appt_id, patient_id, patients.full_name, time, statusCode.status"
+        String sql = "SELECT appt_id, patient_id, patients.full_name, time, statusCode.status"
                 + " FROM appointments"
                 + " INNER JOIN statusCode ON appointments.statusCode = statusCode.statusID "
                 + " INNER JOIN patients ON patients.patientID = appointments.patient_id"
@@ -177,7 +183,7 @@ public class Billing extends Stage {
 
     private String getPatOrders(String patientID, String aInt) {
 
-        String sql = "Select orderCodes.orders "
+        String sql = "SELECT orderCodes.orders "
                 + " FROM appointmentsOrdersConnector "
                 + " INNER JOIN orderCodes ON appointmentsOrdersConnector.orderCodeID = orderCodes.orderID "
                 + " WHERE apptID = '" + aInt + "';";
@@ -225,7 +231,7 @@ public class Billing extends Stage {
 
     private float calculateTotalCost(Appointment appt) {
 
-        String sql = "Select orderCodes.cost "
+        String sql = "SELECT orderCodes.cost "
                 + " FROM appointmentsOrdersConnector "
                 + " INNER JOIN orderCodes ON appointmentsOrdersConnector.orderCodeID = orderCodes.orderID "
                 + " WHERE apptID = '" + appt.getApptID() + "';";
@@ -583,7 +589,13 @@ public class Billing extends Stage {
         
         sql = "SELECT appt_id"
             + " FROM appointments"
-            + ";";
+            + " WHERE time"
+            + " BETWEEN '"
+            + metricsDateBegin.getValue()
+            + " 00:00'"
+            + " AND '"
+            + metricsDateEnd.getValue()
+            + " 23:59';";
         
         try {
             Connection conn = ds.getConnection();
@@ -658,12 +670,20 @@ public class Billing extends Stage {
         metricsContainer.getChildren().addAll(costsChart, caption);
     }
     
-    private void populateInvoiceStatusBreakdown()
+    private void populateAppointmentStatusBreakdown()
     {
         // Obtain all appointments with statuses.
         Map<Integer, Integer> statuses = new HashMap<>();
         // TODO: Add a parameter for specifying date ranges.
-        String sql = "SELECT statuscode FROM appointments;";
+        String sql = "SELECT statuscode"
+                   + " FROM appointments"
+                   + " WHERE time"
+                   + " BETWEEN '"
+                   + metricsDateBegin.getValue()
+                   + " 00:00'"
+                   + " AND '"
+                   + metricsDateEnd.getValue()
+                   + " 23:59';";
         
         try {
             Connection conn = ds.getConnection();
@@ -720,7 +740,7 @@ public class Billing extends Stage {
         metricsContainer.getChildren().addAll(statusesChart, caption);
     }
     
-    private void populateInvoiceAgeBreakdown()
+    private void populateCostTimeline()
     {
         // Obtain status code associated with completed appointment.
         String sql = "SELECT statusid FROM statuscode WHERE status = '"
@@ -741,8 +761,16 @@ public class Billing extends Stage {
         
         // Obtain all appointment IDs by age.
         Map<LocalDate, Long> appts = new HashMap<>();
-        sql = "SELECT appt_id, time FROM appointments WHERE statuscode = "
+        sql = "SELECT appt_id, time"
+            + " FROM appointments"
+            + " WHERE (statuscode = "
             + completedApptStatusCode
+            + ") AND (time BETWEEN '"
+            + metricsDateBegin.getValue()
+            + " 00:00'"
+            + " AND '"
+            + metricsDateEnd.getValue()
+            + " 23:59')"
             + " ORDER BY time ASC;";
         
         LocalDate earliestDate = null;
@@ -767,13 +795,17 @@ public class Billing extends Stage {
         }
         
         // Generate date ranges.
+        if (earliestDate == null) { // In case of no results.
+            earliestDate = metricsDateBegin.getValue();
+            latestDate = metricsDateEnd.getValue();
+        }
         long earliest = earliestDate.toEpochDay();
         long latest = latestDate.toEpochDay();
         LocalDate[] dateRangeEnds = {
-            LocalDate.ofEpochDay((long)(0.3 * earliest + 0.7 * latest)),
-            LocalDate.ofEpochDay((long)(0.1 * earliest + 0.9 * latest)),
-            LocalDate.ofEpochDay((long)(0.03 * earliest + 0.97 * latest)),
-            LocalDate.ofEpochDay((long)(0.01 * earliest + 0.99 * latest)),
+            LocalDate.ofEpochDay((long)(0.2 * earliest + 0.8 * latest)),
+            LocalDate.ofEpochDay((long)(0.4 * earliest + 0.6 * latest)),
+            LocalDate.ofEpochDay((long)(0.6 * earliest + 0.4 * latest)),
+            LocalDate.ofEpochDay((long)(0.8 * earliest + 0.2 * latest)),
             latestDate
         };
         
@@ -990,12 +1022,15 @@ public class Billing extends Stage {
         metricsButtonContainer.setPadding(new Insets(10));
         metricsButtonContainer.setSpacing(10);
         
+        metricsDateBeginLabel.setAlignment(Pos.TOP_RIGHT);
+        metricsDateEndLabel.setAlignment(Pos.TOP_RIGHT);
+        
         // Populate metricsChoiceBox.
         metricsChoiceBox.getItems().clear();
         metricsChoiceBox.getItems().addAll(
             "Methodology Costs",
-            "Invoice Status",
-            "Invoice Age"
+            "Appointment Status",
+            "Costs Timeline"
         );
         metricsChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
                 metricsContainer.getChildren().clear();
@@ -1003,14 +1038,42 @@ public class Billing extends Stage {
                 if (newValue.equals("Methodology Costs")) {
                     populateMethodologyCostBreakdown();
                 }
-                if (newValue.equals("Invoice Status")) {
-                    populateInvoiceStatusBreakdown();
+                if (newValue.equals("Appointment Status")) {
+                    populateAppointmentStatusBreakdown();
                 }
-                if (newValue.equals("Invoice Age")) {
-                    populateInvoiceAgeBreakdown();
+                if (newValue.equals("Costs Timeline")) {
+                    populateCostTimeline();
                 }
             }
         );
+        
+        // Set initial date range.
+        metricsDateBegin.setValue(LocalDate.parse("1900-01-01"));
+        metricsDateEnd.setValue(LocalDate.now());
+        
+        // Add triggers to reload view upon date range change.
+        metricsDateBegin.valueProperty().addListener((obs, oldValue, newValue) -> {
+            // Validation
+            if (newValue.isAfter(metricsDateEnd.getValue())) {
+                metricsDateBegin.setValue(oldValue);
+                return;
+            }
+            // End validation
+            String currentMetricsPageView = metricsChoiceBox.getValue();
+            metricsChoiceBox.setValue("");
+            metricsChoiceBox.setValue(currentMetricsPageView);
+        });
+        metricsDateEnd.valueProperty().addListener((obs, oldValue, newValue) -> {
+            // Validation
+            if (newValue.isBefore(metricsDateBegin.getValue())) {
+                metricsDateEnd.setValue(oldValue);
+                return;
+            }
+            // End validation
+            String currentMetricsPageView = metricsChoiceBox.getValue();
+            metricsChoiceBox.setValue("");
+            metricsChoiceBox.setValue(currentMetricsPageView);
+        });
         
         // Set initial metric view.
         metricsChoiceBox.setValue("Methodology Costs");
