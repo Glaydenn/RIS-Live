@@ -17,8 +17,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -66,18 +65,27 @@ public class Billing extends Stage {
     Label billing = new Label("Billing");
     Label metrics = new Label("Metrics");
 
-    //Search Bar
+    //Search Bar for Billing page view.
     FilteredList<Appointment> flAppointment;
-    ChoiceBox<String> choiceBox = new ChoiceBox();
+    ChoiceBox<String> billingChoiceBox = new ChoiceBox();
     TextField search = new TextField("Search Appointments");
+    
+    // Metric selection for Metrics page view.
+    ChoiceBox<String> metricsChoiceBox = new ChoiceBox();
+    
+    // Metrics date range selector.
+    // TODO: Turn this into an actual date range selector.
+    Label metricsDateRange = new Label("Date range: ALL");
 
     //Buttons
-    Button refreshTable = new Button("Refresh Appointments");
+    Button billingRefreshTable = new Button("Refresh Appointments");
+    
     //Containers
-    HBox searchContainer = new HBox(choiceBox, search); // For billing view.
-    HBox buttonContainer = new HBox(refreshTable, searchContainer); // For billing view.
-    VBox billingContainer = new VBox(table, buttonContainer);
-    VBox metricsContainer = new VBox();
+    HBox billingSearchContainer = new HBox(billingChoiceBox, search);
+    HBox billingButtonContainer = new HBox(billingRefreshTable, billingSearchContainer);
+    VBox billingContainer = new VBox(table, billingButtonContainer);
+    HBox metricsButtonContainer = new HBox(metricsChoiceBox, metricsDateRange);
+    VBox metricsContainer = new VBox(); // Contents added on the fly.
 
 //</editor-fold>
     ArrayList<Order> varName = new ArrayList<>();
@@ -85,7 +93,7 @@ public class Billing extends Stage {
 
     Billing() {
         this.setTitle("RIS- Radiology Information System (Billing)");
-//Navbar
+        //Navbar
         pfp.setPreserveRatio(true);
         pfp.setFitHeight(38);
         navbar.setAlignment(Pos.TOP_RIGHT);
@@ -101,6 +109,10 @@ public class Billing extends Stage {
         
         billing.setId("navbar");
         metrics.setId("navbar");
+        
+        logOut.setOnAction((ActionEvent e) -> {
+            logOut();
+        });
         //End navbar
 
         //Center
@@ -109,7 +121,7 @@ public class Billing extends Stage {
         billing.setOnMouseClicked(eh -> billingPageView());
         metrics.setOnMouseClicked(eh -> metricsPageView());
         //End Center
-        
+
         //Scene Structure
         scene.getStylesheets().add("file:stylesheet.css");
         this.setScene(scene);
@@ -635,7 +647,6 @@ public class Billing extends Stage {
         costsChart.setLegendVisible(false);
         // Show dollar amounts for each methodology in labels.
         final Label caption = new Label("");
-        caption.setStyle("-fx-text-fill: WHITE; -fx-font: 24 arial;");
         for (final PieChart.Data datum : costsChart.getData()) {
             datum.nameProperty().setValue(
                 datum.getName()
@@ -644,15 +655,237 @@ public class Billing extends Stage {
             );
         }
         
-        metricsContainer.getChildren().clear();
         metricsContainer.getChildren().addAll(costsChart, caption);
+    }
+    
+    private void populateInvoiceStatusBreakdown()
+    {
+        // Obtain all appointments with statuses.
+        Map<Integer, Integer> statuses = new HashMap<>();
+        // TODO: Add a parameter for specifying date ranges.
+        String sql = "SELECT statuscode FROM appointments;";
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                Integer status = rs.getInt("statuscode");
+                if (statuses.containsKey(status)) {
+                    // Increment status counter.
+                    statuses.replace(status, statuses.get(status) + 1);
+                } else {
+                    statuses.put(status, 1);
+                }
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Obtain all status codes.
+        Map<Integer, String> statusCodes = new HashMap<>();
+        sql = "SELECT * FROM statuscode;";
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                statusCodes.put(rs.getInt("statusid"), rs.getString("status"));
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Create a pie chart.
+        ObservableList<PieChart.Data> data = FXCollections.observableArrayList();
+        for (Integer status : statuses.keySet()) {
+            data.add(new PieChart.Data(statusCodes.get(status), statuses.get(status)));
+        }
+        PieChart statusesChart = new PieChart(data);
+        statusesChart.setTitle("Appointment Statuses");
+        statusesChart.setLegendVisible(false);
+        // Show quantity for each status in labels.
+        final Label caption = new Label("");
+        for (final PieChart.Data datum : statusesChart.getData()) {
+            datum.nameProperty().setValue(
+                datum.getName()
+                + ": "
+                + (int)datum.getPieValue()
+            );
+        }
+        
+        metricsContainer.getChildren().addAll(statusesChart, caption);
+    }
+    
+    private void populateInvoiceAgeBreakdown()
+    {
+        // Obtain status code associated with completed appointment.
+        String sql = "SELECT statusid FROM statuscode WHERE status = '"
+                   + "Referral Doctor Signature Completed."
+                   + "';";
+        Integer completedApptStatusCode = null;
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            rs.next();
+            completedApptStatusCode = rs.getInt("statusid");
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Obtain all appointment IDs by age.
+        Map<LocalDate, Long> appts = new HashMap<>();
+        sql = "SELECT appt_id, time FROM appointments WHERE statuscode = "
+            + completedApptStatusCode
+            + " ORDER BY time ASC;";
+        
+        LocalDate earliestDate = null;
+        LocalDate latestDate = null;
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                latestDate = LocalDate.parse(rs.getString("time").split(" ")[0]);
+                if (earliestDate == null) {
+                    earliestDate = latestDate;
+                }
+                appts.put(
+                    latestDate,
+                    rs.getLong("appt_id")
+                );
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Generate date ranges.
+        long earliest = earliestDate.toEpochDay();
+        long latest = latestDate.toEpochDay();
+        LocalDate[] dateRangeEnds = {
+            LocalDate.ofEpochDay((long)(0.3 * earliest + 0.7 * latest)),
+            LocalDate.ofEpochDay((long)(0.1 * earliest + 0.9 * latest)),
+            LocalDate.ofEpochDay((long)(0.03 * earliest + 0.97 * latest)),
+            LocalDate.ofEpochDay((long)(0.01 * earliest + 0.99 * latest)),
+            latestDate
+        };
+        
+        // Obtain a list of all methodologies.
+        class Methodology {
+            public Long order_id;
+            public String name;
+            public Float cost;
+        }
+        
+        List<Methodology> methodologies = new ArrayList<>();
+        sql = "SELECT * FROM ordercodes;";
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                Methodology newMethodology = new Methodology();
+                newMethodology.order_id = rs.getLong("orderid");
+                newMethodology.name = rs.getString("orders");
+                newMethodology.cost = rs.getFloat("cost");
+                methodologies.add(newMethodology);
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Obtain appointments corresponding to each date range.
+        List<String>[] apptsByDateRange = new ArrayList[dateRangeEnds.length];
+        // Instantiate ArrayLists.
+        for (int i = 0; i < dateRangeEnds.length; i++) {
+            apptsByDateRange[i] = new ArrayList<>();
+        }
+        for (HashMap.Entry<LocalDate, Long> entry : appts.entrySet()) {
+            // Determine which date range this entry falls into.
+            int dateRange = 0;
+            
+            while (dateRange < dateRangeEnds.length - 1
+                   && entry.getKey().isBefore(dateRangeEnds[dateRange])) {
+                dateRange++;
+            }
+            apptsByDateRange[dateRange].add(entry.getValue().toString());
+        }
+        
+        // Obtain total costs incurred for each date range.
+        Float[] costsByDateRange = new Float[apptsByDateRange.length];
+        for (int i = 0; i < dateRangeEnds.length; i++) {
+            costsByDateRange[i] = 0f;
+            
+            sql = "SELECT ordercodeid"
+                + " FROM appointmentsordersconnector"
+                + " WHERE apptid"
+                + " IN ("
+                + String.join(",", apptsByDateRange[i])
+                + ");";
+
+            try {
+                Connection conn = ds.getConnection();
+                Statement stmt = conn.createStatement();
+                ResultSet rs = stmt.executeQuery(sql);
+                //
+                while (rs.next()) {
+                    Long order_id = rs.getLong("ordercodeid");
+                    for (Methodology methodology : methodologies) {
+                        if (Objects.equals(order_id, methodology.order_id)) {
+                            costsByDateRange[i] += methodology.cost;
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                System.out.println(e.getMessage());
+            }
+        }
+        
+        // Create a pie chart.
+        ObservableList<PieChart.Data> data = FXCollections.observableArrayList();
+        for (int i = 0; i < costsByDateRange.length; i++) {
+            String dateRange;
+            if (i == 0) {
+                dateRange = earliestDate.toString()
+                          + " to "
+                          + dateRangeEnds[0].toString();
+            } else {
+                dateRange = dateRangeEnds[i-1].toString()
+                          + " to "
+                          + dateRangeEnds[i].toString();
+            }
+            data.add(new PieChart.Data(dateRange, costsByDateRange[i]));
+        }
+        PieChart agesChart = new PieChart(data);
+        agesChart.setTitle("Total Costs by Dates");
+        agesChart.setLegendVisible(false);
+        // Show quantity for each status in labels.
+        final Label caption = new Label("");
+        for (final PieChart.Data datum : agesChart.getData()) {
+            datum.nameProperty().setValue(
+                datum.getName()
+                + ": $"
+                + datum.getPieValue()
+            );
+        }
+        
+        metricsContainer.getChildren().addAll(agesChart, caption);
     }
     
     private void billingPageView()
     {
         // Why is this even here?
         billingContainer.getChildren().clear();
-        billingContainer.getChildren().addAll(table, buttonContainer);
+        billingContainer.getChildren().addAll(table, billingButtonContainer);
         
         main.setCenter(billingContainer);
         
@@ -661,8 +894,8 @@ public class Billing extends Stage {
         //Vbox to hold the table
         billingContainer.setAlignment(Pos.TOP_CENTER);
         billingContainer.setPadding(new Insets(20, 10, 10, 10));
-        buttonContainer.setPadding(new Insets(10));
-        buttonContainer.setSpacing(10);
+        billingButtonContainer.setPadding(new Insets(10));
+        billingButtonContainer.setSpacing(10);
         TableColumn apptIDCol = new TableColumn("Appointment ID");
         TableColumn patientIDCol = new TableColumn("Patient ID");
         TableColumn firstNameCol = new TableColumn("Full Name");
@@ -700,12 +933,6 @@ public class Billing extends Stage {
         
         varName = populateOrders();
         //Buttons
-        logOut.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent e) {
-                logOut();
-            }
-        });
 //        addAppointment.setOnAction(new EventHandler<ActionEvent>() {
 //            @Override
 //            public void handle(ActionEvent e) {
@@ -713,11 +940,8 @@ public class Billing extends Stage {
 //            }
 //        });
 
-        refreshTable.setOnAction(new EventHandler<ActionEvent>() {
-            @Override
-            public void handle(ActionEvent e) {
-                populateTable();
-            }
+        billingRefreshTable.setOnAction((ActionEvent e) -> {
+            populateTable();
         });
 //         check.setOnAction(new EventHandler<ActionEvent>() {
 //            @Override
@@ -727,26 +951,27 @@ public class Billing extends Stage {
 //        });
 
         //Searchbar Structure
-        searchContainer.setAlignment(Pos.TOP_RIGHT);
-        HBox.setHgrow(searchContainer, Priority.ALWAYS);
-        choiceBox.setPrefHeight(40);
+        billingSearchContainer.setAlignment(Pos.TOP_RIGHT);
+        HBox.setHgrow(billingSearchContainer, Priority.ALWAYS);
+        billingChoiceBox.setPrefHeight(40);
         search.setPrefHeight(40);
-        choiceBox.getItems().addAll("Appointment ID", "Patient ID", "Full Name", "Date/Time", "Status");
-        choiceBox.setValue("Appointment ID");
+        billingChoiceBox.getItems().clear();
+        billingChoiceBox.getItems().addAll("Appointment ID", "Patient ID", "Full Name", "Date/Time", "Status");
+        billingChoiceBox.setValue("Appointment ID");
         search.textProperty().addListener((obs, oldValue, newValue) -> {
-            if (choiceBox.getValue().equals("Appointment ID")) {
-                flAppointment.setPredicate(p -> new String(p.getApptID() + "").contains(newValue));//filter table by Appt ID
+            if (billingChoiceBox.getValue().equals("Appointment ID")) {
+                flAppointment.setPredicate(p -> (p.getApptID() + "").contains(newValue));//filter table by Appt ID
             }
-            if (choiceBox.getValue().equals("Patient ID")) {
-                flAppointment.setPredicate(p -> new String(p.getPatientID() + "").contains(newValue));//filter table by Patient Id
+            if (billingChoiceBox.getValue().equals("Patient ID")) {
+                flAppointment.setPredicate(p -> (p.getPatientID() + "").contains(newValue));//filter table by Patient Id
             }
-            if (choiceBox.getValue().equals("Full Name")) {
+            if (billingChoiceBox.getValue().equals("Full Name")) {
                 flAppointment.setPredicate(p -> p.getFullName().toLowerCase().contains(newValue.toLowerCase()));//filter table by Full name
             }
-            if (choiceBox.getValue().equals("Date/Time")) {
+            if (billingChoiceBox.getValue().equals("Date/Time")) {
                 flAppointment.setPredicate(p -> p.getTime().contains(newValue));//filter table by Date/Time
             }
-            if (choiceBox.getValue().equals("Status")) {
+            if (billingChoiceBox.getValue().equals("Status")) {
                 flAppointment.setPredicate(p -> p.getStatus().toLowerCase().contains(newValue.toLowerCase()));//filter table by Status
             }
             table.getItems().clear();
@@ -760,9 +985,34 @@ public class Billing extends Stage {
     
     private void metricsPageView()
     {
-        metricsContainer.getChildren().clear();
         main.setCenter(metricsContainer);
         
-        populateMethodologyCostBreakdown();
+        metricsButtonContainer.setPadding(new Insets(10));
+        metricsButtonContainer.setSpacing(10);
+        
+        // Populate metricsChoiceBox.
+        metricsChoiceBox.getItems().clear();
+        metricsChoiceBox.getItems().addAll(
+            "Methodology Costs",
+            "Invoice Status",
+            "Invoice Age"
+        );
+        metricsChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
+                metricsContainer.getChildren().clear();
+                metricsContainer.getChildren().add(metricsButtonContainer);
+                if (newValue.equals("Methodology Costs")) {
+                    populateMethodologyCostBreakdown();
+                }
+                if (newValue.equals("Invoice Status")) {
+                    populateInvoiceStatusBreakdown();
+                }
+                if (newValue.equals("Invoice Age")) {
+                    populateInvoiceAgeBreakdown();
+                }
+            }
+        );
+        
+        // Set initial metric view.
+        metricsChoiceBox.setValue("Methodology Costs");
     }
 }
