@@ -381,7 +381,7 @@ public class Receptionist extends Stage {
                 container.getChildren().clear();
 
                 ComboBox dropdown = new ComboBox();
-                dropdown.getItems().addAll("Patient Did Not Show", "Appointment Scheduled", "Patient Checked In", "Patient received by Technician", "Patient Cancelled", "Faculty Cancelled");
+                dropdown.getItems().addAll("Patient Did Not Show", "Appointment Scheduled", "Patient Checked In", "Patient Cancelled", "Faculty Cancelled");
 
                 dropdown.setValue(appt.getStatus());
                 Button submit = new Button("Submit");
@@ -796,7 +796,7 @@ public class Receptionist extends Stage {
                 }
 
             });
-
+               
             submit.setOnAction(new EventHandler<ActionEvent>() {
                 @Override
                 public void handle(ActionEvent e) {
@@ -807,8 +807,16 @@ public class Receptionist extends Stage {
                     if (!InputValidation.validateFutureTime(datePicker.getValue().toString(), full)) {
                         return;
                     }
-                    insertAppointment(pat.getPatientID(), orders, datePicker.getValue().toString() + " " + full);
-                }
+                    if (orders.isEmpty() == true ) {
+                        Alert a = new Alert(Alert.AlertType.INFORMATION);
+                        a.setTitle("Error");
+                        a.setHeaderText("Try Again");
+                        a.setContentText("Patient does not have any orders selected. \n");
+                        a.show();
+                        return;
+                    }
+                    insertAppointment(pat.getPatientID(), orders, datePicker.getValue().toString() + " " + full);           
+               }
             });
 
         }
@@ -858,7 +866,7 @@ public class Receptionist extends Stage {
             }
             return value;
         }
-
+            
         private Patient pullPatientInfo(String patFullName, String patEmail) {
             Patient temp = null;
 
