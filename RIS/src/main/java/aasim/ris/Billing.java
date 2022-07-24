@@ -21,12 +21,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.chart.PieChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
@@ -37,6 +39,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
@@ -45,6 +48,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.util.Pair;
 
 public class Billing extends Stage {
     
@@ -533,6 +537,117 @@ public class Billing extends Stage {
         this.close();
     }
     
+    private void populateMethodologyCostBreakdown()
+    {
+        // Obtain a list of all methodologies.
+        class Methodology {
+            public Long order_id;
+            public String name;
+            public Float cost;
+        }
+        
+        List<Methodology> methodologies = new ArrayList<>();
+        String sql = "SELECT * FROM ordercodes;";
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                Methodology newMethodology = new Methodology();
+                newMethodology.order_id = rs.getLong("orderid");
+                newMethodology.name = rs.getString("orders");
+                newMethodology.cost = rs.getFloat("cost");
+                methodologies.add(newMethodology);
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // TODO: Add a parameter for specifying date ranges.
+        // Obtain a list of all appointments.
+        List<String> appt_ids = new ArrayList<>();
+        
+        sql = "SELECT appt_id"
+            + " FROM appointments"
+            + ";";
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                appt_ids.add(rs.getString("appt_id"));
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Obtain a list of orders associated with all appointments.
+        List<Long> order_ids = new ArrayList<>();
+        sql = "SELECT ordercodeid"
+            + " FROM appointmentsordersconnector"
+            + " WHERE apptid"
+            + " IN ("
+            + String.join(",", appt_ids)
+            + ");";
+        
+        try {
+            Connection conn = ds.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(sql);
+            //
+            while (rs.next()) {
+                order_ids.add(rs.getLong("ordercodeid"));
+            }
+        } catch (SQLException e) {
+            System.out.println(e.getMessage());
+        }
+        
+        // Compute the total cost attributed to each methodology.
+        List<Pair<Methodology, Float>> costs = new ArrayList<>();
+        for (Methodology methodology : methodologies) {
+            // Compute the total cost of the `i`th methodology.
+            int orders = 0;
+            for (Long order_id : order_ids) {
+                if (order_id.equals(methodology.order_id)) {
+                    orders++;
+                }
+            }
+            
+            // Store this cost in the list of total costs.
+            Pair<Methodology, Float> cost = new Pair<>(
+                    methodology,
+                    methodology.cost * orders
+            );
+            costs.add(cost);
+        }
+        
+        // Create a pie chart.
+        ObservableList<PieChart.Data> data = FXCollections.observableArrayList();
+        for (Pair<Methodology, Float> cost : costs) {
+            data.add(new PieChart.Data(cost.getKey().name, cost.getValue()));
+        }
+        PieChart costsChart = new PieChart(data);
+        costsChart.setTitle("Total Costs by Methodology");
+        costsChart.setLegendVisible(false);
+        // Show dollar amounts for each methodology in labels.
+        final Label caption = new Label("");
+        caption.setStyle("-fx-text-fill: WHITE; -fx-font: 24 arial;");
+        for (final PieChart.Data datum : costsChart.getData()) {
+            datum.nameProperty().setValue(
+                datum.getName()
+                + ": $"
+                + datum.getPieValue()
+            );
+        }
+        
+        metricsContainer.getChildren().clear();
+        metricsContainer.getChildren().addAll(costsChart, caption);
+    }
+    
     private void billingPageView()
     {
         // Why is this even here?
@@ -648,7 +763,6 @@ public class Billing extends Stage {
         metricsContainer.getChildren().clear();
         main.setCenter(metricsContainer);
         
-        Label helloWorld = new Label("Metrics dashboard is currently under construction.");
-        metricsContainer.getChildren().add(helloWorld);
+        populateMethodologyCostBreakdown();
     }
 }
