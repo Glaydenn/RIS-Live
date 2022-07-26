@@ -555,9 +555,9 @@ public class Billing extends Stage {
         this.close();
     }
     
-    private void populateMethodologyCostBreakdown()
+    private void populateProcedureCostBreakdown()
     {
-        // Obtain a list of all methodologies.
+        // Obtain a list of all procedure methodologies.
         class Methodology {
             public Long order_id;
             public String name;
@@ -655,7 +655,7 @@ public class Billing extends Stage {
             data.add(new PieChart.Data(cost.getKey().name, cost.getValue()));
         }
         PieChart costsChart = new PieChart(data);
-        costsChart.setTitle("Total Costs by Methodology");
+        costsChart.setTitle("Total Costs by Procedure");
         costsChart.setLegendVisible(false);
         // Show dollar amounts for each methodology in labels.
         final Label caption = new Label("");
@@ -1028,15 +1028,15 @@ public class Billing extends Stage {
         // Populate metricsChoiceBox.
         metricsChoiceBox.getItems().clear();
         metricsChoiceBox.getItems().addAll(
-            "Methodology Costs",
+            "Procedure Costs",
             "Appointment Status",
             "Costs Timeline"
         );
         metricsChoiceBox.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> {
                 metricsContainer.getChildren().clear();
                 metricsContainer.getChildren().add(metricsButtonContainer);
-                if (newValue.equals("Methodology Costs")) {
-                    populateMethodologyCostBreakdown();
+                if (newValue.equals("Procedure Costs")) {
+                    populateProcedureCostBreakdown();
                 }
                 if (newValue.equals("Appointment Status")) {
                     populateAppointmentStatusBreakdown();
@@ -1076,6 +1076,6 @@ public class Billing extends Stage {
         });
         
         // Set initial metric view.
-        metricsChoiceBox.setValue("Methodology Costs");
+        metricsChoiceBox.setValue("Procedure Costs");
     }
 }
