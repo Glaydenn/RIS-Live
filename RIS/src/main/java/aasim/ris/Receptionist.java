@@ -807,7 +807,7 @@ public class Receptionist extends Stage {
                     if (!InputValidation.validateFutureTime(datePicker.getValue().toString(), full)) {
                         return;
                     }
-                    if (orders.isEmpty() == true ) {
+                    if (orders.isEmpty()) {
                         Alert a = new Alert(Alert.AlertType.INFORMATION);
                         a.setTitle("Error");
                         a.setHeaderText("Try Again");
