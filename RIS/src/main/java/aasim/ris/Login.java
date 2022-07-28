@@ -11,10 +11,15 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -39,6 +44,8 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 
 /**
  *
@@ -233,7 +240,6 @@ public class Login extends Stage {
     //Checks for valid database connection
     private void connectToDatabase() {
         try {
-
             File credentials = new File("../credentials.ris");
             if (!credentials.exists()) {
                 credentials.createNewFile();
@@ -260,6 +266,23 @@ public class Login extends Stage {
                                 byte[] strToBytes = area.getText().getBytes();
                                 outputStream.write(strToBytes);
                                 App.url = area.getText();
+                                // Read SSL root certificate path from URL.
+                                List<NameValuePair> params = URLEncodedUtils.parse(App.url, Charset.forName("UTF-8"));
+                                String sslRootCert = null;
+                                for (NameValuePair param : params) {
+                                    if (param.getName().equals("sslrootcert")) {
+                                        sslRootCert = param.getValue();
+                                    }
+                                }
+                                if (sslRootCert == null) {
+                                    throw(new IllegalArgumentException("sslrootcert URL parameter not provided."));
+                                }
+                                // Resolve any variables in the cert path.
+                                sslRootCert = sslRootCert.replaceAll("\\$HOME", System.getenv().get("HOME")); // *nix
+                                sslRootCert = sslRootCert.replaceAll("\\$env:appdata", System.getenv().get("APPDATA")); // Windows
+                                // Set cert path.
+                                System.out.println(sslRootCert); // TODO: Remove.
+                                ds.setSslRootCert(sslRootCert);
                                 ds.setUrl(Optional.ofNullable(url).orElseThrow(() -> new IllegalArgumentException("JDBC_DATABASE_URL is not set.")));
                             } catch (FileNotFoundException ex) {
                                 Logger.getLogger(Login.class.getName()).log(Level.SEVERE, null, ex);
@@ -296,8 +319,27 @@ public class Login extends Stage {
                 fr.close();    //closes the stream and release the resources
                 try {
                     App.url = sb.toString();
+                    // Read SSL root certificate path from URL.
+                    List<NameValuePair> params = URLEncodedUtils.parse(App.url, Charset.forName("UTF-8"));
+                    String sslRootCert = null;
+                    for (NameValuePair param : params) {
+                        if (param.getName().equals("sslrootcert")) {
+                            sslRootCert = param.getValue();
+                        }
+                    }
+                    if (sslRootCert == null) {
+                        throw(new IllegalArgumentException("sslrootcert URL parameter not provided."));
+                    }
+                    // Resolve any variables in the cert path.
+                    sslRootCert = sslRootCert.replaceAll("\\$HOME", System.getenv().get("HOME")); // *nix
+                    sslRootCert = sslRootCert.replaceAll("\\$env:appdata", System.getenv().get("APPDATA")); // Windows
+                    // Set cert path.
+                    System.out.println(sslRootCert); // TODO: Remove.
+                    ds.setSslRootCert(sslRootCert);
+                    // Set database URL.
                     ds.setUrl(Optional.ofNullable(url).orElseThrow(() -> new IllegalArgumentException("JDBC_DATABASE_URL is not set.")));
                 } catch (IllegalArgumentException ex) {
+                    System.out.println(ex.getMessage());
                     credentials.delete();
                     Alert a = new Alert(AlertType.INFORMATION);
                     a.setTitle("Error");
