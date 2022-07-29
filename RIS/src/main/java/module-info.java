@@ -10,6 +10,10 @@ module aasim.ris {
     //Cockroach DB
     requires java.naming;
     requires org.postgresql.jdbc;
+    
+    //Apache httpclient
+    requires org.apache.httpcomponents.httpclient;
+    requires org.apache.httpcomponents.httpcore;
 
     opens datastorage;
     exports aasim.ris;
