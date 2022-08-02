@@ -1,3 +1,4 @@
 RIS/target/
 RIS/root.crt
 credentials.ris
+*.jar

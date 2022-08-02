@@ -38,11 +38,12 @@ public class App extends Application {
     }
 
     /**
-     * Finds the root certificate to connect to the database.
+     * Connects to the database and populates (if relevant logic is uncommented).
      *
      */
     public static void main1(String[] args) {
-        ds.setSslRootCert("root.crt");
+        // Deprecated in favor of loading cert path from database URL.
+        // ds.setSslRootCert("root.crt");
         launch();
         
         /* Populate the database.

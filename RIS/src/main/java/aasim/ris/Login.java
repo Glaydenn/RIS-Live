@@ -4,17 +4,15 @@ import static aasim.ris.App.ds;
 import static aasim.ris.App.url;
 import datastorage.InputValidation;
 import datastorage.User;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.IOException;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,17 +26,14 @@ import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
-import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
-import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import javafx.scene.text.Text;
-import javafx.stage.Modality;
 import javafx.stage.Stage;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
 
 /**
  *
@@ -233,82 +228,35 @@ public class Login extends Stage {
     //Checks for valid database connection
     private void connectToDatabase() {
         try {
-
-            File credentials = new File("../credentials.ris");
-            if (!credentials.exists()) {
-                credentials.createNewFile();
-                Stage x = new Stage();
-                x.initOwner(this);
-                x.initModality(Modality.WINDOW_MODAL);
-                BorderPane y = new BorderPane();
-                Scene z = new Scene(y);
-                z.getStylesheets().add("file:stylesheet.css");
-                x.setScene(z);
-                Text text = new Text("Insert URL");
-                TextArea area = new TextArea();
-                Button submit = new Button("Submit");
-                HBox container = new HBox(text, area, submit);
-                y.setCenter(container);
-                x.show();
-                submit.setOnAction(new EventHandler<ActionEvent>() {
-                    @Override
-                    public void handle(ActionEvent eh) {
-                        if (!area.getText().isEmpty()) {
-                            FileOutputStream outputStream = null;
-                            try {
-                                outputStream = new FileOutputStream(credentials);
-                                byte[] strToBytes = area.getText().getBytes();
-                                outputStream.write(strToBytes);
-                                App.url = area.getText();
-                                ds.setUrl(Optional.ofNullable(url).orElseThrow(() -> new IllegalArgumentException("JDBC_DATABASE_URL is not set.")));
-                            } catch (FileNotFoundException ex) {
-                                Logger.getLogger(Login.class.getName()).log(Level.SEVERE, null, ex);
-                            } catch (IOException ex) {
-                                Logger.getLogger(Login.class.getName()).log(Level.SEVERE, null, ex);
-                            } catch (IllegalArgumentException ex) {
-                                credentials.delete();
-                                Alert a = new Alert(AlertType.INFORMATION);
-                                a.setTitle("Error");
-                                a.setHeaderText("URL Invalid");
-                                a.setContentText("URL Invalid. Please contact your Administrator. (Restart Application)");
-                                a.showAndWait();
-
-                            } finally {
-                                try {
-                                    outputStream.close();
-                                } catch (IOException ex) {
-                                    Logger.getLogger(Login.class.getName()).log(Level.SEVERE, null, ex);
-                                }
-                            }
-                            x.close();
-
-                        }
-                    }
-                });
-            } else {
-                FileReader fr = new FileReader(credentials);   //reads the file  
-                BufferedReader br = new BufferedReader(fr);  //creates a buffering character input stream  
-                StringBuffer sb = new StringBuffer();    //constructs a string buffer with no characters  
-                String line;
-                while ((line = br.readLine()) != null) {
-                    sb.append(line);      //appends line to string buffer  
-                }
-                fr.close();    //closes the stream and release the resources
-                try {
-                    App.url = sb.toString();
-                    ds.setUrl(Optional.ofNullable(url).orElseThrow(() -> new IllegalArgumentException("JDBC_DATABASE_URL is not set.")));
-                } catch (IllegalArgumentException ex) {
-                    credentials.delete();
-                    Alert a = new Alert(AlertType.INFORMATION);
-                    a.setTitle("Error");
-                    a.setHeaderText("URL Invalid");
-                    a.setContentText("URL Invalid. Please contact your Administrator. (Restart Application)");
-                    a.showAndWait();
-                }
-
+            App.url = System.getenv("JDBC_DATABASE_URL");
+            if (App.url == null) {
+                throw(new IllegalArgumentException("JDBC_DATABASE_URL is not set."));
             }
-        } catch (IOException ex) {
-            Logger.getLogger(Login.class.getName()).log(Level.SEVERE, null, ex);
+            // Read SSL root certificate path from URL.
+            List<NameValuePair> params = URLEncodedUtils.parse(App.url, Charset.forName("UTF-8"));
+            String sslRootCert = null;
+            for (NameValuePair param : params) {
+                if (param.getName().equals("sslrootcert")) {
+                    sslRootCert = param.getValue();
+                }
+            }
+            if (sslRootCert == null) {
+                throw(new IllegalArgumentException("sslrootcert URL parameter not provided."));
+            }
+            // Resolve any variables in the cert path.
+            sslRootCert = sslRootCert.replaceAll("\\$HOME", System.getenv().get("HOME")); // *nix
+            sslRootCert = sslRootCert.replaceAll("\\$env:appdata", System.getenv().get("APPDATA")); // Windows
+            // Set cert path.
+            ds.setSslRootCert(sslRootCert);
+            // Set database URL.
+            ds.setUrl(App.url);
+        } catch (IllegalArgumentException ex) {
+            System.out.println(ex.getMessage());
+            Alert a = new Alert(AlertType.INFORMATION);
+            a.setTitle("Error");
+            a.setHeaderText("URL Invalid");
+            a.setContentText("URL Invalid. Please contact your Administrator. (" + ex.getMessage() + ")");
+            a.showAndWait();
         }
     }
 }
